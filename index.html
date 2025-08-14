@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Secret World Overlay</title>
+  <link rel="stylesheet" href="./src/styles.css" />
+</head>
+<body>
+  <div id="ui">
+    <h1>Secret World</h1>
+    <div id="status">Initializing...</div>
+    <div id="player-info">
+      <div>Lat: <span id="lat">-</span> Lon: <span id="lon">-</span></div>
+      <div>Accuracy: <span id="accuracy">-</span>m</div>
+      <div>Seed: <span id="seed">-</span></div>
+    </div>
+    <div id="log"></div>
+  </div>
+  <canvas id="world" width="800" height="600"></canvas>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
