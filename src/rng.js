@@ -22,3 +22,21 @@ export function geoTimeSeed(lat, lon, timeBucketMinutes = 15) {
   mix(la); mix(lo); mix(bucket);
   return h >>> 0;
 }
+
+// Stable region seed (independent of time). Quantize coordinates to a grid cell size (degrees).
+// cellSizeDeg default 0.01 ~= 1.1km latitude.
+export function regionSeed(lat, lon, cellSizeDeg = 0.01) {
+  const cellLat = Math.floor((lat + 90) / cellSizeDeg);
+  const cellLon = Math.floor((lon + 180) / cellSizeDeg);
+  let h = 2166136261 >>> 0;
+  function mix(v){ h ^= v; h = Math.imul(h, 16777619); }
+  mix(cellLat); mix(cellLon);
+  return h >>> 0;
+}
+
+// Utility to hash multiple numbers into a deterministic 32-bit id string (hex)
+export function hashId(...nums) {
+  let h = 2166136261 >>> 0;
+  for (const n of nums) { h ^= (n|0); h = Math.imul(h,16777619); }
+  return (h>>>0).toString(16);
+}

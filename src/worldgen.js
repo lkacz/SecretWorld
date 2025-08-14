@@ -1,33 +1,36 @@
 import { mulberry32 } from './rng.js';
 
-// Basic procedural generation logic using a seed
-export function generateEntities(seed, centerLat, centerLon) {
-  const rand = mulberry32(seed);
-  const entities = [];
-  // Generate a deterministic set of POIs around player within a radius (meters)
-  const poiCount = 12; // adjustable density
-  const radiusMeters = 1200; // 1.2km ring
-  for (let i = 0; i < poiCount; i++) {
-    const r = Math.sqrt(rand()) * radiusMeters; // bias outward evenly
+// Stable POIs derived from a region seed (do not change with time buckets)
+export function generateStablePOIs(regionSeedValue, centerLat, centerLon) {
+  const rand = mulberry32(regionSeedValue);
+  const list = [];
+  const poiCount = 10; // fewer, more meaningful
+  const radiusMeters = 1500;
+  for (let i=0; i<poiCount; i++) {
+    const r = Math.sqrt(rand()) * radiusMeters;
     const theta = rand() * Math.PI * 2;
-    const offsetLat = (r * Math.cos(theta)) / 111320; // meters to degrees
+    const offsetLat = (r * Math.cos(theta)) / 111320;
     const offsetLon = (r * Math.sin(theta)) / (111320 * Math.cos(centerLat * Math.PI / 180));
     const lat = centerLat + offsetLat;
     const lon = centerLon + offsetLon;
     const kindRoll = rand();
     let type;
-    if (kindRoll < 0.25) type = 'tower';
-    else if (kindRoll < 0.45) type = 'stronghold';
-    else if (kindRoll < 0.70) type = 'castle';
-    else if (kindRoll < 0.85) type = 'portal';
+    if (kindRoll < 0.20) type = 'tower';
+    else if (kindRoll < 0.38) type = 'stronghold';
+    else if (kindRoll < 0.60) type = 'castle';
+    else if (kindRoll < 0.78) type = 'portal';
     else type = 'lair';
-
-    entities.push({ id:`poi-${i}`, type, lat, lon });
+    list.push({ id:`poi-${i}`, type, lat, lon, stable:true });
   }
+  return list;
+}
 
-  // Generate some mobs closer to the player
-  const mobCount = 24;
-  const mobRadius = 400; // meters
+// Ephemeral mobs that rotate with time-based seed
+export function generateEphemeralMobs(timeSeed, centerLat, centerLon) {
+  const rand = mulberry32(timeSeed);
+  const list = [];
+  const mobCount = 28;
+  const mobRadius = 500;
   for (let m=0; m<mobCount; m++) {
     const r = Math.sqrt(rand()) * mobRadius;
     const angle = rand()*Math.PI*2;
@@ -36,11 +39,11 @@ export function generateEntities(seed, centerLat, centerLon) {
     const lat = centerLat + offsetLat;
     const lon = centerLon + offsetLon;
     const tierRoll = rand();
-    let tier = tierRoll < 0.6 ? 1 : tierRoll < 0.85 ? 2 : 3;
-    entities.push({ id:`mob-${m}`, type:'mob', tier, lat, lon });
+    const tier = tierRoll < 0.6 ? 1 : tierRoll < 0.85 ? 2 : 3;
+    const hp = tier * 25 + Math.floor(rand()*15);
+    list.push({ id:`mob-${m}`, type:'mob', tier, hp, maxHp: hp, lat, lon, stable:false });
   }
-
-  return entities;
+  return list;
 }
 
 // Convert lat/lon to local flat coordinates relative to origin (player) using equirectangular approximation.

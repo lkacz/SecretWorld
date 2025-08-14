@@ -1,5 +1,5 @@
-import { geoTimeSeed } from './rng.js';
-import { generateEntities, projectToLocal, computeDistance } from './worldgen.js';
+import { geoTimeSeed, regionSeed } from './rng.js';
+import { generateStablePOIs, generateEphemeralMobs, projectToLocal, computeDistance } from './worldgen.js';
 
 const canvas = document.getElementById('world');
 const ctx = canvas.getContext('2d');
@@ -18,8 +18,11 @@ const closeInteractionBtn = document.getElementById('close-interaction');
 
 let lastPos = null;
 let lastGenPos = null;
+let stablePOIs = [];
+let mobs = [];
 let entities = [];
-let seed = 0;
+let seed = 0; // time-based seed (for mobs)
+let regionStableSeed = 0; // region seed for POIs
 let selectedEntityId = null;
 
 function log(msg) {
@@ -60,26 +63,39 @@ function onLocation(pos) {
   updateWorld();
 }
 
-function shouldRegenerate(newSeed, latitude, longitude) {
-  if (!lastGenPos) return { regen: true, reason: 'initial' };
-  if (newSeed !== seed) return { regen: true, reason: 'time-bucket' };
+function shouldRegenerate(newTimeSeed, latitude, longitude, newRegionSeed) {
+  if (!lastGenPos) return { regenMobs: true, regenPOI: true, reason: 'initial' };
+  const reasons = [];
+  let regenMobs = false, regenPOI = false;
+  if (newTimeSeed !== seed) { regenMobs = true; reasons.push('time-bucket'); }
+  if (newRegionSeed !== regionStableSeed) { regenPOI = true; reasons.push('region-shift'); }
   const moved = computeDistance(lastGenPos.lat, lastGenPos.lon, latitude, longitude);
-  if (moved > 120) return { regen: true, reason: 'moved-'+Math.round(moved)+'m' };
-  return { regen:false };
+  if (moved > 120) { regenMobs = true; reasons.push('moved-'+Math.round(moved)+'m'); }
+  if (!regenMobs && !regenPOI) return { regenMobs:false, regenPOI:false };
+  return { regenMobs, regenPOI, reason: reasons.join('+') };
 }
 
 function updateWorld() {
   if (!lastPos) return;
   const { latitude, longitude } = lastPos.coords;
-  const newSeed = geoTimeSeed(latitude, longitude, 15);
-  const regenCheck = shouldRegenerate(newSeed, latitude, longitude);
-  if (regenCheck.regen || entities.length === 0) {
-    seed = newSeed;
+  const newTimeSeed = geoTimeSeed(latitude, longitude, 15);
+  const newRegionSeed = regionSeed(latitude, longitude, 0.01);
+  const regenCheck = shouldRegenerate(newTimeSeed, latitude, longitude, newRegionSeed);
+  if (regenCheck.regenMobs || regenCheck.regenPOI || entities.length === 0) {
+    if (regenCheck.regenPOI || stablePOIs.length === 0) {
+      regionStableSeed = newRegionSeed;
+      stablePOIs = generateStablePOIs(regionStableSeed, latitude, longitude);
+    }
+    if (regenCheck.regenMobs || mobs.length === 0) {
+      seed = newTimeSeed;
+      mobs = generateEphemeralMobs(seed, latitude, longitude);
+    }
     seedEl.textContent = seed.toString(16);
-    entities = generateEntities(seed, latitude, longitude);
     lastGenPos = { lat: latitude, lon: longitude };
-    regenReasonEl.textContent = regenCheck.reason;
-    log('Generated entities '+entities.length+' seed '+seed.toString(16)+' ('+regenCheck.reason+')');
+    entities = [...stablePOIs, ...mobs];
+    regenReasonEl.textContent = regenCheck.reason || '-';
+    log(`Generated P:${stablePOIs.length} M:${mobs.length} timeSeed ${seed.toString(16)} regionSeed ${regionStableSeed.toString(16)} (${regenCheck.reason||'no-reason'})`);
+    persistState();
     rebuildNearbyList();
   }
   draw();
@@ -124,12 +140,13 @@ function draw() {
   for (const e of entities) {
     const p = projectToLocal(e.lat, e.lon, lastPos.coords.latitude, lastPos.coords.longitude);
     const dist = Math.hypot(p.x, p.y);
-    const scale = 1;
     if (e.type === 'mob') {
-      ctx.fillStyle = e.id === selectedEntityId ? '#fff' : (e.tier === 1 ? '#5f5' : e.tier === 2 ? '#fc5' : '#f55');
-      ctx.beginPath();
-      ctx.arc(p.x/2, -p.y/2, 4 + e.tier*2, 0, Math.PI*2);
-      ctx.fill();
+      const hpFrac = e.hp / e.maxHp;
+      ctx.fillStyle = e.id === selectedEntityId ? '#fff' : (hpFrac > 0.66 ? '#5f5' : hpFrac > 0.33 ? '#fc5' : '#f55');
+      ctx.beginPath(); ctx.arc(p.x/2, -p.y/2, 4 + e.tier*2, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x/2, -p.y/2, 5 + e.tier*2, 0, Math.PI*2*hpFrac); ctx.stroke();
     } else {
       ctx.strokeStyle = e.id === selectedEntityId ? '#5ab0ff' : '#ccc';
       ctx.lineWidth = 2;
@@ -139,7 +156,7 @@ function draw() {
       ctx.stroke();
       ctx.fillStyle = '#eee';
       ctx.font = '11px system-ui';
-      ctx.fillText(e.type, p.x/2 - size/2, -p.y/2 - size/2 - 4);
+      ctx.fillText(e.type + (e.stable?'':'*'), p.x/2 - size/2, -p.y/2 - size/2 - 4);
     }
 
     // Distance label for close objects
@@ -177,8 +194,12 @@ function selectEntity(id) {
   interactTitle.textContent = ent.type.toUpperCase();
   interactDetails.innerHTML = `ID: ${ent.id}<br>`+
     `Lat: ${ent.lat.toFixed(5)} Lon: ${ent.lon.toFixed(5)}<br>`+
-    (ent.tier?`Tier: ${ent.tier}<br>`:'')+
-    `Seed: ${seed.toString(16)}`;
+    (ent.tier?`Tier: ${ent.tier} HP: ${ent.hp}/${ent.maxHp}<br>`:'')+
+    `Stable: ${ent.stable?'yes':'no'}<br>`+
+    `Time Seed: ${seed.toString(16)}<br>`+
+    `<button id="engage-btn" ${ent.type!=='mob'?'disabled':''}>Engage</button>`;
+  const engage = document.getElementById('engage-btn');
+  if (engage && ent.type==='mob') engage.addEventListener('click', ()=> engageCombat(ent.id));
   rebuildNearbyList();
   draw();
 }
@@ -212,6 +233,52 @@ canvas.addEventListener('click', evt => {
 });
 
 setInterval(()=>{ updateWorld(); rebuildNearbyList(); }, 10000);
+
+function engageCombat(id) {
+  const ent = mobs.find(m=>m.id===id);
+  if (!ent) return;
+  const dmg = 5 + ((Date.now() % 5000)/1000 | 0); // 5-9
+  ent.hp = Math.max(0, ent.hp - dmg);
+  log(`Engaged ${ent.id} for ${dmg} dmg (HP ${ent.hp}/${ent.maxHp})`);
+  if (ent.hp === 0) {
+    log(`${ent.id} defeated.`);
+    mobs = mobs.filter(m=>m.id!==id);
+    entities = [...stablePOIs, ...mobs];
+    selectedEntityId = null;
+    interactionPanel.hidden = true;
+  } else if (selectedEntityId === id) {
+    selectEntity(id);
+  }
+  persistState();
+  rebuildNearbyList();
+  draw();
+}
+
+// Persistence
+const STORAGE_KEY = 'secretworld_v1_state';
+function persistState() {
+  const payload = {
+    timeSeed: seed,
+    regionSeed: regionStableSeed,
+    mobs: mobs.map(m=>({ id:m.id, tier:m.tier, hp:m.hp, maxHp:m.maxHp, lat:m.lat, lon:m.lon })),
+    stablePOIs: stablePOIs.map(p=>({ id:p.id, type:p.type, lat:p.lat, lon:p.lon }))
+  };
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch(e) {}
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    seed = data.timeSeed || seed;
+    regionStableSeed = data.regionSeed || regionStableSeed;
+    stablePOIs = (data.stablePOIs||[]).map(p=>({ ...p, stable:true }));
+    mobs = (data.mobs||[]).map(m=>({ ...m, type:'mob', stable:false }));
+    entities = [...stablePOIs, ...mobs];
+    log('Loaded persisted state.');
+  } catch(e) {}
+}
+loadState();
 
 resize();
 requestLocation();
