@@ -11,6 +11,17 @@ const lonEl = document.getElementById('lon');
 const accEl = document.getElementById('accuracy');
 const seedEl = document.getElementById('seed');
 const regenReasonEl = document.getElementById('regen-reason');
+// Debug elements
+const dbgGeoSupport = document.getElementById('dbg-geo-support');
+const dbgPerm = document.getElementById('dbg-perm');
+const dbgError = document.getElementById('dbg-error');
+const dbgLastUpdate = document.getElementById('dbg-last-update');
+const dbgUpdateCount = document.getElementById('dbg-update-count');
+const dbgApprox = document.getElementById('dbg-approx');
+const dbgWatchId = document.getElementById('dbg-watch-id');
+const toggleDebugBtn = document.getElementById('toggle-debug');
+const debugPanel = document.getElementById('debug');
+const ipFallbackBtn = document.getElementById('ip-fallback');
 const nearbyListEl = document.getElementById('nearby-list');
 const interactionPanel = document.getElementById('interaction');
 const interactTitle = document.getElementById('interact-title');
@@ -27,6 +38,9 @@ let entityLayerGroup; // Leaflet layer group for entities
 let seed = 0; // time-based seed (for mobs)
 let regionStableSeed = 0; // region seed for POIs
 let selectedEntityId = null;
+let updateCount = 0;
+let usedApprox = false;
+let watchId = null;
 
 function log(msg) {
   const line = document.createElement('div');
@@ -36,17 +50,32 @@ function log(msg) {
 }
 
 function requestLocation() {
+  dbgGeoSupport && (dbgGeoSupport.textContent = ('geolocation' in navigator) ? 'yes' : 'no');
   if (!('geolocation' in navigator)) {
     statusEl.textContent = 'Geolocation not supported';
     statusEl.className = 'bad';
+    if (ipFallbackBtn) ipFallbackBtn.hidden = false;
     return;
   }
   statusEl.textContent = 'Requesting location...';
-  navigator.geolocation.watchPosition(onLocation, onLocationError, {
-    enableHighAccuracy: true,
-    maximumAge: 5000,
-    timeout: 10000
-  });
+  if (navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: 'geolocation' }).then(p => {
+      if (dbgPerm) dbgPerm.textContent = p.state;
+      p.onchange = () => { if (dbgPerm) dbgPerm.textContent = p.state; if (p.state === 'denied' && ipFallbackBtn) ipFallbackBtn.hidden = false; };
+      if (p.state === 'denied' && ipFallbackBtn) ipFallbackBtn.hidden = false;
+    }).catch(()=>{});
+  } else if (dbgPerm) { dbgPerm.textContent = 'unknown'; }
+  try {
+    watchId = navigator.geolocation.watchPosition(onLocation, onLocationError, {
+      enableHighAccuracy: true,
+      maximumAge: 5000,
+      timeout: 10000
+    });
+    if (dbgWatchId) dbgWatchId.textContent = watchId;
+  } catch(e) {
+    if (dbgError) dbgError.textContent = e.message;
+    if (ipFallbackBtn) ipFallbackBtn.hidden = false;
+  }
   initMap();
 }
 
@@ -65,7 +94,11 @@ function initMap() {
 function onLocationError(err) {
   statusEl.textContent = 'Location error: ' + err.message;
   statusEl.className = 'bad';
-  log('Geo error: ' + err.message);
+  if (dbgError) dbgError.textContent = err.message + ' code=' + err.code;
+  log('Geo error: ' + err.message + ' code=' + err.code);
+  if (err.code === 1 && ipFallbackBtn) { // permission denied
+    ipFallbackBtn.hidden = false;
+  }
 }
 
 function onLocation(pos) {
@@ -78,6 +111,9 @@ function onLocation(pos) {
   statusEl.className = 'good';
   updateWorld();
   updateMapPlayer(latitude, longitude);
+  updateCount++;
+  if (dbgUpdateCount) dbgUpdateCount.textContent = updateCount;
+  if (dbgLastUpdate) dbgLastUpdate.textContent = new Date().toLocaleTimeString();
 }
 
 function updateMapPlayer(lat, lon) {
@@ -274,6 +310,40 @@ canvas.addEventListener('click', evt => {
 });
 
 setInterval(()=>{ updateWorld(); rebuildNearbyList(); }, 10000);
+setInterval(()=>{ if(lastPos && dbgLastUpdate) dbgLastUpdate.textContent = new Date().toLocaleTimeString(); }, 60000);
+
+toggleDebugBtn?.addEventListener('click', ()=> {
+  const showing = !debugPanel.hidden;
+  debugPanel.hidden = showing;
+  toggleDebugBtn.textContent = showing ? 'Show Debug' : 'Hide Debug';
+});
+
+ipFallbackBtn?.addEventListener('click', ()=> {
+  fetchApproxIPLocation();
+});
+
+async function fetchApproxIPLocation() {
+  try {
+    statusEl.textContent = 'Fetching approximate IP location...';
+    const resp = await fetch('https://ipapi.co/json/');
+    if (!resp.ok) throw new Error('ip lookup failed');
+    const data = await resp.json();
+    if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+      usedApprox = true;
+      if (dbgApprox) dbgApprox.textContent = 'yes';
+      const fauxPos = { coords: { latitude: data.latitude, longitude: data.longitude, accuracy: 50000 }, timestamp: Date.now() };
+      onLocation(fauxPos);
+      statusEl.textContent = 'Approx IP location used';
+      statusEl.className = 'warn';
+    } else {
+      throw new Error('No coords');
+    }
+  } catch(e) {
+    log('IP fallback failed: ' + e.message);
+    statusEl.textContent = 'IP fallback failed';
+    statusEl.className = 'bad';
+  }
+}
 
 function engageCombat(id) {
   const ent = mobs.find(m=>m.id===id);

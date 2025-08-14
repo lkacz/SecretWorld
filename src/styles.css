@@ -18,3 +18,7 @@ canvas#world { position:absolute; top:0; left:0; display:block; width:100vw; hei
 #interaction h3 { margin:0 0 4px; font-size:14px; }
 #interaction button { background:#284c72; border:none; color:#fff; padding:4px 10px; border-radius:4px; cursor:pointer; }
 #interaction button:hover { background:#376894; }
+#debug { margin-top:10px; font-size:12px; background:#121c29; padding:6px 8px; border:1px solid #223448; border-radius:4px; }
+#debug-controls { margin:8px 0; display:flex; gap:6px; flex-wrap:wrap; }
+#debug-controls button { background:#203040; color:#eee; border:1px solid #36506a; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:12px; }
+#debug-controls button:hover { background:#2b4258; }

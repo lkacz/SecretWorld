@@ -28,6 +28,20 @@
       <button id="close-interaction">Close</button>
     </div>
     <div id="log"></div>
+    <div id="debug-controls">
+      <button id="toggle-debug">Show Debug</button>
+      <button id="ip-fallback" hidden>Use Approximate IP Location</button>
+    </div>
+    <div id="debug" hidden>
+      <h3>Debug</h3>
+      <div><strong>Geo Support:</strong> <span id="dbg-geo-support">?</span></div>
+      <div><strong>Permission:</strong> <span id="dbg-perm">?</span></div>
+      <div><strong>Last Error:</strong> <span id="dbg-error">-</span></div>
+      <div><strong>Last Update:</strong> <span id="dbg-last-update">-</span></div>
+      <div><strong>Updates Count:</strong> <span id="dbg-update-count">0</span></div>
+      <div><strong>Using Approx:</strong> <span id="dbg-approx">no</span></div>
+      <div><strong>Watch ID:</strong> <span id="dbg-watch-id">-</span></div>
+    </div>
   </div>
   <div id="map"></div>
   <canvas id="world" width="800" height="600"></canvas>
