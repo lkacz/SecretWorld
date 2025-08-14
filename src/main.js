@@ -21,6 +21,7 @@ const dbgApprox = document.getElementById('dbg-approx');
 const dbgWatchId = document.getElementById('dbg-watch-id');
 const toggleDebugBtn = document.getElementById('toggle-debug');
 const debugPanel = document.getElementById('debug');
+const envWarn = document.getElementById('env-warn');
 const ipFallbackBtn = document.getElementById('ip-fallback');
 const nearbyListEl = document.getElementById('nearby-list');
 const interactionPanel = document.getElementById('interaction');
@@ -313,9 +314,10 @@ setInterval(()=>{ updateWorld(); rebuildNearbyList(); }, 10000);
 setInterval(()=>{ if(lastPos && dbgLastUpdate) dbgLastUpdate.textContent = new Date().toLocaleTimeString(); }, 60000);
 
 toggleDebugBtn?.addEventListener('click', ()=> {
-  const showing = !debugPanel.hidden;
-  debugPanel.hidden = showing;
-  toggleDebugBtn.textContent = showing ? 'Show Debug' : 'Hide Debug';
+  if (!debugPanel) return;
+  const willShow = debugPanel.hidden;
+  debugPanel.hidden = !willShow;
+  if (toggleDebugBtn) toggleDebugBtn.textContent = willShow ? 'Hide Debug' : 'Show Debug';
 });
 
 ipFallbackBtn?.addEventListener('click', ()=> {
@@ -394,3 +396,11 @@ loadState();
 
 resize();
 requestLocation();
+
+// Environment warning for file:// usage (CORS / permissions hints)
+if (location.protocol === 'file:') {
+  if (envWarn) {
+    envWarn.hidden = false;
+    envWarn.innerHTML = 'Running via file:// can block some APIs (CORS, SRI). Prefer a local server. <br>Quick start (PowerShell): <code>python -m http.server 8080</code> or <code>npx serve .</code>';
+  }
+}

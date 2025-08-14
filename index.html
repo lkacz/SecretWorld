@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Secret World Overlay</title>
   <link rel="stylesheet" href="./src/styles.css" />
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-o9N1j7kGStb6QbE7h6Aj8kGAK7C0C4B2tGZ7nDGx9wM=" crossorigin="" />
+  <!-- Leaflet CSS (correct SRI) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9Dxi2yoHS5bR7R9F2lw5o=" crossorigin="" />
 </head>
 <body>
   <div id="ui">
@@ -27,7 +27,8 @@
       <div id="interact-details"></div>
       <button id="close-interaction">Close</button>
     </div>
-    <div id="log"></div>
+  <div id="log"></div>
+  <div id="env-warn" hidden></div>
     <div id="debug-controls">
       <button id="toggle-debug">Show Debug</button>
       <button id="ip-fallback" hidden>Use Approximate IP Location</button>
@@ -45,8 +46,8 @@
   </div>
   <div id="map"></div>
   <canvas id="world" width="800" height="600"></canvas>
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-o8EeYJ8GZ8AfevkpzxxEe7dBDEu4SU/EYEYwS4hZ8kM=" crossorigin=""></script>
+  <!-- Leaflet JS (correct SRI) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9coqB1zjUR8Z7ZKk5lHMS5QZTQGFtiY6jk0=" crossorigin=""></script>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>
