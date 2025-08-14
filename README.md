@@ -19,8 +19,28 @@ A minimal browser-based location + time seeded procedural world overlay (inspire
 - `src/main.js` – App glue: geolocation, rendering, periodic updates.
 
 ## Running
-Just open `index.html` in a modern browser (Chrome, Firefox, Safari, Edge). On first load you'll be asked for geolocation permission.
-If testing on desktop without movement, you can use DevTools > Sensors (Chrome) to spoof location.
+DO NOT double‑click `index.html` (file://) — many browsers block geolocation, SRI, and fetches there. Serve it over HTTP.
+
+Quick options (PowerShell):
+```
+python -m http.server 8080
+# or if you have Node.js
+npx serve .
+```
+Then open: http://localhost:8080/
+
+If you prefer a minimal embedded server, create `server.js`:
+```js
+import http from 'node:http'; import { readFileSync } from 'node:fs'; import { extname } from 'node:path';
+const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json'};
+http.createServer((req,res)=>{ let p=req.url==='/'?'/index.html':req.url; try { const data=readFileSync('.'+p); res.writeHead(200,{ 'Content-Type': types[extname(p)]||'application/octet-stream','Cache-Control':'no-cache'}); res.end(data);} catch(e){ res.writeHead(404); res.end('404'); }}).listen(8080,()=>console.log('Dev server http://localhost:8080')); 
+```
+Run with:
+```
+node server.js
+```
+
+Chrome location simulation: DevTools > More Tools > Sensors.
 
 ## Extensibility Roadmap
 
