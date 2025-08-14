@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Secret World Overlay</title>
   <link rel="stylesheet" href="./src/styles.css" />
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-o9N1j7kGStb6QbE7h6Aj8kGAK7C0C4B2tGZ7nDGx9wM=" crossorigin="" />
 </head>
 <body>
   <div id="ui">
@@ -27,7 +29,10 @@
     </div>
     <div id="log"></div>
   </div>
+  <div id="map"></div>
   <canvas id="world" width="800" height="600"></canvas>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-o8EeYJ8GZ8AfevkpzxxEe7dBDEu4SU/EYEYwS4hZ8kM=" crossorigin=""></script>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>

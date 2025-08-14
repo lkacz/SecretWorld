@@ -2,6 +2,7 @@ import { geoTimeSeed, regionSeed } from './rng.js';
 import { generateStablePOIs, generateEphemeralMobs, projectToLocal, computeDistance } from './worldgen.js';
 
 const canvas = document.getElementById('world');
+const mapDiv = document.getElementById('map');
 const ctx = canvas.getContext('2d');
 const statusEl = document.getElementById('status');
 const logEl = document.getElementById('log');
@@ -21,6 +22,8 @@ let lastGenPos = null;
 let stablePOIs = [];
 let mobs = [];
 let entities = [];
+let map, playerMarker;
+let entityLayerGroup; // Leaflet layer group for entities
 let seed = 0; // time-based seed (for mobs)
 let regionStableSeed = 0; // region seed for POIs
 let selectedEntityId = null;
@@ -44,6 +47,19 @@ function requestLocation() {
     maximumAge: 5000,
     timeout: 10000
   });
+  initMap();
+}
+
+function initMap() {
+  if (map) return;
+  map = L.map('map', { zoomControl: true, worldCopyJump: true });
+  // Temp center until we get real location
+  map.setView([0,0], 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 20,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+  entityLayerGroup = L.layerGroup().addTo(map);
 }
 
 function onLocationError(err) {
@@ -61,6 +77,17 @@ function onLocation(pos) {
   statusEl.textContent = 'Tracking';
   statusEl.className = 'good';
   updateWorld();
+  updateMapPlayer(latitude, longitude);
+}
+
+function updateMapPlayer(lat, lon) {
+  if (!map) return;
+  if (!playerMarker) {
+    playerMarker = L.marker([lat, lon], { title: 'You' }).addTo(map);
+    map.setView([lat, lon], 16);
+  } else {
+    playerMarker.setLatLng([lat, lon]);
+  }
 }
 
 function shouldRegenerate(newTimeSeed, latitude, longitude, newRegionSeed) {
@@ -92,11 +119,12 @@ function updateWorld() {
     }
     seedEl.textContent = seed.toString(16);
     lastGenPos = { lat: latitude, lon: longitude };
-    entities = [...stablePOIs, ...mobs];
+  entities = [...stablePOIs, ...mobs];
     regenReasonEl.textContent = regenCheck.reason || '-';
     log(`Generated P:${stablePOIs.length} M:${mobs.length} timeSeed ${seed.toString(16)} regionSeed ${regionStableSeed.toString(16)} (${regenCheck.reason||'no-reason'})`);
     persistState();
     rebuildNearbyList();
+  refreshMapEntities();
   }
   draw();
 }
@@ -165,6 +193,19 @@ function draw() {
       ctx.font = '10px system-ui';
       ctx.fillText(Math.round(dist) + 'm', p.x/2 + 6, -p.y/2 + 4);
     }
+  }
+}
+
+function refreshMapEntities() {
+  if (!entityLayerGroup || !lastPos) return;
+  entityLayerGroup.clearLayers();
+  for (const e of entities) {
+    const color = e.type === 'mob' ? (e.tier===1?'#55ff55': e.tier===2?'#ffcc55':'#ff5555') : '#66aaff';
+    const html = `<div style="transform:translate(-50%,-50%);background:${e.type==='mob'?'#111b28':'#0d2238'};color:${color};border:1px solid ${color};padding:2px 4px;border-radius:4px;font-size:11px;white-space:nowrap;">${e.type}${e.tier?(' T'+e.tier):''}</div>`;
+    const icon = L.divIcon({ html, className:'', iconSize:[0,0] });
+    const marker = L.marker([e.lat, e.lon], { icon });
+    marker.on('click', ()=> selectEntity(e.id));
+    entityLayerGroup.addLayer(marker);
   }
 }
 
@@ -252,6 +293,7 @@ function engageCombat(id) {
   persistState();
   rebuildNearbyList();
   draw();
+  refreshMapEntities();
 }
 
 // Persistence
